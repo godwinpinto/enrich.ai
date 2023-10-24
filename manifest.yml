@@ -1,0 +1,35 @@
+modules:
+  jira:issuePanel:
+    - key: enrich2-hello-world-panel
+      resource: main
+      resolver:
+        function: resolver
+      viewportSize: medium
+      title: Enrich.AI
+      icon: https://enrich-icon.vercel.app/enrich-icon.svg
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: static/hello-world/build
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+  content:
+    styles:
+      - 'unsafe-inline'
+  external:
+    fetch:
+      backend:
+        - 'https://www.github.com'    
+        - 'https://www.api.github.com'    
+        - 'https://api.github.com'
+        - 'https://api.atlassian.com'
+        - 'https://generativelanguage.googleapis.com'
+        - '*'
+app:
+  id: ari:cloud:ecosystem::app/c0e41651-d01c-4cce-bc37-e464e95c74ce
+  runtime:
+    name: nodejs18.x    
