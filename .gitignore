@@ -48,6 +48,10 @@ Thumbs.db
 *.mov
 *.wmv
 
-static/hello-world/node_modules/
 package-lock.json
-static/hello-world/package-lock.json
+static/admin-page/node_modules/
+static/admin-page/build/
+static/admin-page/package-lock.json
+static/user-panel/node_modules/
+static/user-panel/build/
+static/user-panel/package-lock.json

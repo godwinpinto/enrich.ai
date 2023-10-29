@@ -1,34 +1,47 @@
 modules:
   jira:issuePanel:
-    - key: enrich2-hello-world-panel
-      resource: main
+    - key: enrich-panel
+      resource: user-panel
       resolver:
-        function: resolver
+        function: user-panel-api
       viewportSize: medium
       title: Enrich.AI
       icon: https://enrich-icon.vercel.app/enrich-icon.svg
+  jira:adminPage:
+    - key: admin-page
+      resource: admin-page
+      resolver:
+        function: admin-page-api
+      title: Enrich.AI Admin
+      icon: https://enrich-icon.vercel.app/enrich-icon.svg
   function:
-    - key: resolver
+    - key: user-panel-api
       handler: index.handler
+    - key: admin-page-api
+      handler: admin-api.handler
 resources:
-  - key: main
-    path: static/hello-world/build
+  - key: user-panel
+    path: static/user-panel/build
+    tunnel:
+      port: 3000
+  - key: admin-page
+    path: static/admin-page/build
+    tunnel:
+      port: 3001
 permissions:
   scopes:
     - read:jira-work
     - write:jira-work
+    - storage:app
   content:
     styles:
       - 'unsafe-inline'
   external:
     fetch:
       backend:
-        - 'https://www.github.com'    
-        - 'https://www.api.github.com'    
-        - 'https://api.github.com'
-        - 'https://api.atlassian.com'
-        - 'https://generativelanguage.googleapis.com'
-        - '*'
+        - 'github.com'    
+        - 'api.github.com'
+        - 'generativelanguage.googleapis.com'
 app:
   id: ari:cloud:ecosystem::app/c0e41651-d01c-4cce-bc37-e464e95c74ce
   runtime:
