@@ -271,14 +271,103 @@ resolver.define('generate-comments', async (req) => {
  * @param {string} creationType - Type of creation ('M' for modified, other for new branch).
  * @returns {boolean} True if successful, false otherwise.
  */
+// const getFileDifferenceAndCommit = async (originalBranchName, newBranchName, originalBranchRepo, creationType) => {
+//   try {
+
+//     const { octokit, owner, makerSuiteApiKey } = await getConfig(null)
+//     if (!owner) {
+//       return false;
+//     }
+
+
+//     // Get the latest commit on the branch
+//     const latestCommitResponse = await octokit.rest.repos.getBranch({
+//       owner: owner,
+//       repo: originalBranchRepo,
+//       branch: originalBranchName,
+//     });
+//     const latestCommitSha = latestCommitResponse.data.commit.sha;
+
+//     const commitDiffResponse = await (creationType == 'M' ?
+//       octokit.rest.repos.compareCommits({
+//         owner: owner,
+//         repo: originalBranchRepo,
+//         base: 'main',
+//         head: originalBranchName,
+//       })
+//       : octokit.rest.repos.getCommit({
+//         owner: owner,
+//         repo: originalBranchRepo,
+//         ref: latestCommitSha,
+//       }));
+
+//     const newBranchResponse = await octokit.rest.git.createRef({
+//       owner: owner,
+//       repo: originalBranchRepo,
+//       ref: `refs/heads/${newBranchName}`,
+//       sha: latestCommitSha,
+//     });
+
+//     const filesChanged = commitDiffResponse.data.files;
+
+//     const promises = filesChanged.map(async (file) => {
+//       if (file.status === "added" || file.status === "modified") {
+//         try {
+//           const fileResponse = await octokit.rest.repos.getContent({
+//             owner: owner,
+//             repo: originalBranchRepo,
+//             path: file.filename,
+//             ref: latestCommitSha,
+//           });
+
+//           const content = Buffer.from(fileResponse.data.content, "base64").toString("utf-8");
+
+//           const aiContent = await callGenerativeAI(`Add code comments to the provided code ${content}. Do not remove any code`, makerSuiteApiKey);
+//           const modifiedContent = aiContent == '' ? content : aiContent.replace(/```[a-zA-Z]+\n/g, '').replace(/```/g, '');
+
+//           return {
+//             fileResponse,
+//             modifiedContent,
+//             file,
+//           };
+//         } catch (error) {
+//           console.error(`Error processing file '${file.filename}':`, error);
+//         }
+//       }
+//     });
+
+//     const processedFiles = await Promise.all(promises);
+
+//     for (const { fileResponse, modifiedContent, file } of processedFiles) {
+//       try {
+//         await octokit.rest.repos.createOrUpdateFileContents({
+//           owner: owner,
+//           repo: originalBranchRepo,
+//           path: file.filename,
+//           message: "Enrich AI Comments added",
+//           content: Buffer.from(modifiedContent).toString("base64"),
+//           branch: newBranchName,
+//           sha: fileResponse.data.sha,
+//         });
+
+//       } catch (error) {
+//         console.error(`Error processing file '${file.filename}':`, error);
+//       }
+//     }
+//     return true;
+//   } catch (error) {
+//     console.error(error);
+//   }
+//   return false;
+// }
+
+
 const getFileDifferenceAndCommit = async (originalBranchName, newBranchName, originalBranchRepo, creationType) => {
   try {
-
-    const { octokit, owner, makerSuiteApiKey } = await getConfig(null)
+    const { octokit, owner, makerSuiteApiKey } = await getConfig(null);
     if (!owner) {
       return false;
     }
-
 
     // Get the latest commit on the branch
     const latestCommitResponse = await octokit.rest.repos.getBranch({
@@ -288,18 +377,18 @@ const getFileDifferenceAndCommit = async (originalBranchName, newBranchName, ori
     });
     const latestCommitSha = latestCommitResponse.data.commit.sha;
 
-    const commitDiffResponse = await (creationType == 'M' ?
-      octokit.rest.repos.compareCommits({
-        owner: owner,
-        repo: originalBranchRepo,
-        base: 'main',
-        head: originalBranchName,
-      })
+    const commitDiffResponse = await (creationType === 'M'
+      ? octokit.rest.repos.compareCommits({
+          owner: owner,
+          repo: originalBranchRepo,
+          base: 'main',
+          head: originalBranchName,
+        })
       : octokit.rest.repos.getCommit({
-        owner: owner,
-        repo: originalBranchRepo,
-        ref: latestCommitSha,
-      }));
+          owner: owner,
+          repo: originalBranchRepo,
+          ref: latestCommitSha,
+        }));
 
     const newBranchResponse = await octokit.rest.git.createRef({
       owner: owner,
@@ -310,56 +399,68 @@ const getFileDifferenceAndCommit = async (originalBranchName, newBranchName, ori
 
     const filesChanged = commitDiffResponse.data.files;
 
-    const promises = filesChanged.map(async (file) => {
-      if (file.status === "added" || file.status === "modified") {
-        try {
-          const fileResponse = await octokit.rest.repos.getContent({
-            owner: owner,
-            repo: originalBranchRepo,
-            path: file.filename,
-            ref: latestCommitSha,
-          });
+    const treeChanges = filesChanged
+      .filter(file => file.status === 'added' || file.status === 'modified')
+      .map(file => ({
+        path: file.filename,
+        mode: '100644',
+        type: 'blob',
+        content: '', // We'll fill this in later
+      }));
 
-          const content = Buffer.from(fileResponse.data.content, "base64").toString("utf-8");
+    const promises = treeChanges.map(async change => {
+      try {
+        const fileResponse = await octokit.rest.repos.getContent({
+          owner: owner,
+          repo: originalBranchRepo,
+          path: change.path,
+          ref: latestCommitSha,
+        });
 
-          const aiContent = await callGenerativeAI(`Add code comments to the provided code ${content}. Do not remove any code`, makerSuiteApiKey);
-          const modifiedContent = aiContent == '' ? content : aiContent.replace(/```[a-zA-Z]+\n/g, '').replace(/```/g, '');
+        const content = Buffer.from(fileResponse.data.content, 'base64').toString('utf-8');
 
-          return {
-            fileResponse,
-            modifiedContent,
-            file,
-          };
-        } catch (error) {
-          console.error(`Error processing file '${file.filename}':`, error);
-        }
+        const aiContent = await callGenerativeAI(`Add code comments to the provided code ${content}. Do not remove any code`, makerSuiteApiKey);
+        const modifiedContent = aiContent === '' ? content : aiContent.replace(/```[a-zA-Z]+\n/g, '').replace(/```/g, '');
+
+        //change.content = Buffer.from(modifiedContent).toString('base64');
+        change.content = modifiedContent;
+        return change;
+      } catch (error) {
+        console.error(`Error processing file '${change.path}':`, error);
+        return null;
       }
     });
 
-    const processedFiles = await Promise.all(promises);
+    const modifiedTreeChanges = await Promise.all(promises);
 
-    for (const { fileResponse, modifiedContent, file } of processedFiles) {
-      try {
-        await octokit.rest.repos.createOrUpdateFileContents({
-          owner: owner,
-          repo: originalBranchRepo,
-          path: file.filename,
-          message: "Enrich AI Comments added",
-          content: Buffer.from(modifiedContent).toString("base64"),
-          branch: newBranchName,
-          sha: fileResponse.data.sha,
-        });
+    const newTree = await octokit.rest.git.createTree({
+      owner: owner,
+      repo: originalBranchRepo,
+      base_tree: latestCommitResponse.data.commit.commit.tree.sha,
+      tree: modifiedTreeChanges.filter(change => change !== null),
+    });
 
-      } catch (error) {
-        console.error(`Error processing file '${file.filename}':`, error);
-      }
-    }
+    const newCommit = await octokit.rest.git.createCommit({
+      owner: owner,
+      repo: originalBranchRepo,
+      message: 'Enrich AI Comments added',
+      tree: newTree.data.sha,
+      parents: [latestCommitSha],
+    });
+
+    await octokit.rest.git.updateRef({
+      owner: owner,
+      repo: originalBranchRepo,
+      ref: `heads/${newBranchName}`,
+      sha: newCommit.data.sha,
+    });
+
     return true;
   } catch (error) {
     console.error(error);
+    return false;
   }
-  return false;
-}
+};
 
 /**
  * Gets the first and last commits of a branch.
